@@ -9,6 +9,7 @@
 
 # ignore certain folder under all subdirectories
 __pycache__/
+model_save/
 
 # ignore certain directory
 temp/
