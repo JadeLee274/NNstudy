@@ -3,6 +3,7 @@ import argparse
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
+from torchvision import transforms as T
 from vae import VAE
 from tensordataset import TensorDataset
 from typing import *
@@ -18,7 +19,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--out_channels_list",
         type=list,
-        required=True,
         default=[16, 32, 64, 128, 256],
     )
     parser.add_argument(
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     optimizer = optim.Adam(
-        params=model.parameters,
+        params=model.parameters(),
         lr=args.learning_rate,
         weight_decay=1e-03,
     )
@@ -80,6 +80,17 @@ if __name__ == "__main__":
     dataset=TensorDataset(
         data_root=args.data_root,
         input_size=args.input_size,
+        transform=T.Compose(
+            [
+                T.Resize(
+                    size=args.input_size,
+                ),
+                T.CenterCrop(
+                    size=args.input_size,
+                ),
+                T.ToTensor()
+            ]
+        )
     )
 
     train_set, val_set = random_split(
@@ -102,11 +113,10 @@ if __name__ == "__main__":
 
     for epoch in range(args.epochs):
         model.train()
-        loss = 0.
+        train_loss = 0.
         for datas in train_loader:
             optimizer.zero_grad()
             datas = datas.to(device)
-            batch_size, channels, height, width = datas.shape
             datas_hat, datas, mu, log_var = model(datas)
             criterion = model.loss_fn(
                 x_hat=datas_hat,
@@ -116,23 +126,24 @@ if __name__ == "__main__":
             )['Loss']
             criterion.backward()
             optimizer.step()
-            loss += criterion
-        print(loss)
+            train_loss += criterion
+        print(f"Epoch {epoch + 1}: Train Loss = {train_loss:.4e}")
 
-        if epoch % args.save_interval == 0:
+        if (epoch + 1) % args.save_interval == 0:
             model.eval()
-            loss = 0.
+            val_loss = 0.
             for datas in val_loader:
+                datas = datas.to(device)
                 with torch.no_grad():
-                    datas_hat, datas, mu, log_var = model
+                    datas_hat, datas, mu, log_var = model(datas)
                     criterion = model.loss_fn(
                         x_hat=datas_hat,
                         x=datas,
                         mu=mu,
                         log_var=log_var,
                     )['Loss']
-                    loss += criterion
-            print(loss)
+                    val_loss += criterion
+            print(f"Epoch {epoch + 1}: Validation Loss = {val_loss:.4e}")
             torch.save(
                 {
                     'epoch': epoch + 1,

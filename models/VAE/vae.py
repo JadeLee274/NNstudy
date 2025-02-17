@@ -25,17 +25,19 @@ class VAE(nn.Module):
 
         for out_channels in out_channels_list:
             encoder_list.append(
-                nn.Conv2d(
-                    in_channels=channel,
-                    out_channels=out_channels,
-                    kernel_size=3,
-                    stride=2,
-                    padding=1,
-                ),
-                nn.BatchNorm2d(
-                    num_features=out_channels,
-                ),
-                nn.ReLU(),
+                nn.Sequential(
+                    nn.Conv2d(
+                        in_channels=channel,
+                        out_channels=out_channels,
+                        kernel_size=3,
+                        stride=2,
+                        padding=1,
+                    ),
+                    nn.BatchNorm2d(
+                        num_features=out_channels,
+                    ),
+                    nn.ReLU(),
+                )
             )
             channel = out_channels
         self.encoder = nn.Sequential(*encoder_list)
@@ -43,28 +45,28 @@ class VAE(nn.Module):
         self.fc_mu = nn.Linear(
             in_features=(
                 out_channels_list[-1] 
-                * (input_size / (2 ** len(out_channels_list)))
-                * (input_size / (2 ** len(out_channels_list)))
+                * int((input_size / (2 ** len(out_channels_list))))
+                * int((input_size / (2 ** len(out_channels_list))))
             ),
             out_features=hidden_dim,
             )
         
         self.fc_var = nn.Linear(
             in_features=(
-                out_channels_list[-1]
-                * (input_size / (2 ** len(out_channels_list))) 
-                * (input_size / (2 ** len(out_channels_list)))
+                out_channels_list[-1] 
+                * int((input_size / (2 ** len(out_channels_list))))
+                * int((input_size / (2 ** len(out_channels_list))))
             ),
             out_features=hidden_dim,
-        )
+            )
 
         self.fc_dec = nn.Sequential(
             nn.Linear(
                 in_features=hidden_dim,
                 out_features=(
                     out_channels_list[-1]
-                    * (input_size / (2 ** len(out_channels_list)))
-                    * (input_size / (2 ** len(out_channels_list)))
+                    * int((input_size / (2 ** len(out_channels_list))))
+                    * int((input_size / (2 ** len(out_channels_list))))
                 ),
             )
         )
@@ -72,20 +74,22 @@ class VAE(nn.Module):
         dec_list = []
         for i in range(len(out_channels_list) - 1):
             dec_list.append(
-                nn.ConvTranspose2d(
-                    in_channels=out_channels_list[len(out_channels_list) 
-                                                  - (i + 1)],
-                    out_channels=out_channels_list[len(out_channels_list)
-                                              - (i + 2)],
-                    kernel_size=3,
-                    stride=1,
-                    padding=1,
-                ),
-                nn.BatchNorm2d(
-                    num_features=out_channels_list[len(out_channels_list)
-                                                   - (i + 2)],
-                ),
-                nn.ReLU(),
+                nn.Sequential(
+                    nn.ConvTranspose2d(
+                        in_channels=out_channels_list[len(out_channels_list)
+                                                     - (i + 1)],
+                        out_channels=out_channels_list[len(out_channels_list)
+                                                       - (i + 2)],
+                        kernel_size=3,
+                        stride=2,
+                        padding=1,
+                    ),
+                    nn.BatchNorm2d(
+                        num_features=out_channels_list[len(out_channels_list)
+                                                       - (i + 2)],
+                    ),
+                    nn.ReLU(),
+                )
             )
         dec_list.append(
             nn.ConvTranspose2d(
@@ -116,13 +120,14 @@ class VAE(nn.Module):
         out = out.view(
             -1,
             self.out_channels_list[-1],
-            (self.input_size / (2 ** len(self.out_channels_list))),
-            (self.input_size / (2 ** len(self.out_channels_list)))
+            int((self.input_size / (2 ** len(self.out_channels_list)))),
+            int((self.input_size / (2 ** len(self.out_channels_list))))
         )
         reconstrucsion = self.decoder(out)
         return reconstrucsion
     
     def reparametrization(
+            self,
             mu: Matrix,
             log_var: Matrix,
     ) -> Matrix:

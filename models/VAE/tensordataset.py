@@ -13,22 +13,13 @@ class TensorDataset(Dataset):
             self,
             data_root: str,
             input_size: int,
+            transform: Any = None,
     ) -> None:
         super().__init__()
         self.dataset = [
             os.path.join(data_root, file) for file in os.listdir(data_root)
         ]
-        self.transform = T.Compose(
-            [
-                T.Resize(
-                    size=(input_size, input_size),
-                ),
-                T.CenterCrop(
-                    size=input_size,
-                ),
-                T.ToTensor(),
-            ]
-        ) 
+        self.transform = transform
 
     def __len__(
             self,
@@ -41,5 +32,6 @@ class TensorDataset(Dataset):
     ) -> Tensor:
         data_path = self.dataset[idx]
         data = Image.open(data_path).convert('RGB')
-        data = self.transform(data)
+        if self.transform:
+            data = self.transform(data)
         return data
