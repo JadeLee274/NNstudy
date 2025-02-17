@@ -79,7 +79,6 @@ def main():
         
         print(f'\nEpoch {epoch + 1} Train Loss: {epoch_loss:.4e}')
 
-    # 주기적으로 validation 수행 + loss, accuracy 등 주기적으로 print
         model.eval()
         correct = 0.
         with torch.no_grad():

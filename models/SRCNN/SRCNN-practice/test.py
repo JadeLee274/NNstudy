@@ -10,9 +10,9 @@ from models import SRCNN
 from utils import convert_rgb_to_ycbcr, convert_ycbcr_to_rgb, calc_psnr
 
 if __name__ == '__main__':
-    root = '/data/home/tmdals274/NNstudy/SRCNN/SRCNN-practice/outputs/x3'
+    root = '/root/do/data'
     weight_file = os.path.join(root, 'epoch_400.pth')
-    image_file = '/data/home/tmdals274/NNstudy/SRCNN/SRCNN-practice/data/butterfly_GT.bmp'
+    image_file = '/root/to/image'
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights-file', type = str, defalut = weight_file)

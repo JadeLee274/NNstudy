@@ -14,7 +14,7 @@ from datasets import TrainDataset, EvalDataset
 from utils import AverageMeter, calc_psnr
 
 if __name__ == '__main__':
-    root = '/data/tmdals274/NNstudy/data/srcnn_data'
+    root = '/root/to/data'
     train_file = os.path.join(root, '91-image_x3.h5')
     eval_file = os.path.join(root, 'Set5_x3.h5')
     parser = argparse.ArgumentParser()
