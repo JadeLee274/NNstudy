@@ -1,0 +1,13 @@
+# ignore certain extensions
+*.pt
+*.ipynb
+*.pdf
+*.xlsx
+*.docx
+*.csv
+
+# ignore certain folder under all subdirectories
+__pycache__/
+
+# ignore certain directory
+temp/
