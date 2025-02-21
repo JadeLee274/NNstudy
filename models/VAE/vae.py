@@ -83,6 +83,7 @@ class VAE(nn.Module):
                         kernel_size=3,
                         stride=2,
                         padding=1,
+                        output_padding=1,
                     ),
                     nn.BatchNorm2d(
                         num_features=out_channels_list[len(out_channels_list)
@@ -92,12 +93,26 @@ class VAE(nn.Module):
                 )
             )
         dec_list.append(
-            nn.ConvTranspose2d(
-                in_channels=out_channels_list[0],
-                out_channels=in_channels,
-                kernel_size=3,
-                stride=1,
-                padding=1,
+            nn.Sequential(
+                nn.ConvTranspose2d(
+                    in_channels=out_channels_list[0],
+                    out_channels=out_channels_list[0],
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    output_padding=1,
+                ),
+                nn.BatchNorm2d(
+                    num_features=out_channels_list[0],
+                ),
+                nn.ReLU(),
+                nn.Conv2d(
+                    in_channels=out_channels_list[0],
+                    out_channels=in_channels,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                )
             )
         )
         self.decoder = nn.Sequential(*dec_list)

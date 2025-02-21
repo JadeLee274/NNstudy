@@ -12,7 +12,6 @@ class TensorDataset(Dataset):
     def __init__(
             self,
             data_root: str,
-            input_size: int,
             transform: Any = None,
     ) -> None:
         super().__init__()

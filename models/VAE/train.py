@@ -79,7 +79,6 @@ if __name__ == "__main__":
 
     dataset=TensorDataset(
         data_root=args.data_root,
-        input_size=args.input_size,
         transform=T.Compose(
             [
                 T.Resize(
