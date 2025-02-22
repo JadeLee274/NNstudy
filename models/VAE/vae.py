@@ -36,7 +36,7 @@ class VAE(nn.Module):
                     nn.BatchNorm2d(
                         num_features=out_channels,
                     ),
-                    nn.ReLU(),
+                    nn.LeakyReLU(),
                 )
             )
             channel = out_channels
@@ -89,7 +89,7 @@ class VAE(nn.Module):
                         num_features=out_channels_list[len(out_channels_list)
                                                        - (i + 2)],
                     ),
-                    nn.ReLU(),
+                    nn.LeakyReLU(),
                 )
             )
         dec_list.append(
@@ -105,7 +105,7 @@ class VAE(nn.Module):
                 nn.BatchNorm2d(
                     num_features=out_channels_list[0],
                 ),
-                nn.ReLU(),
+                nn.LeakyReLU(),
                 nn.Conv2d(
                     in_channels=out_channels_list[0],
                     out_channels=in_channels,

@@ -145,9 +145,8 @@ if __name__ == "__main__":
             print(f"Epoch {epoch + 1}: Validation Loss = {val_loss:.4e}")
             torch.save(
                 {
-                    'epoch': epoch + 1,
                     'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict,
+                    'optimizer_state_dict': optimizer.state_dict(),
                 },
                 f'./model_save/vae_epoch_{epoch + 1}.pt',
             )
