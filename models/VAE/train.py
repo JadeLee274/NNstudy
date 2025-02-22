@@ -50,6 +50,11 @@ if __name__ == "__main__":
         default=64,
     )
     parser.add_argument(
+        "--checkpoint",
+        type=int,
+        default=0,
+    )
+    parser.add_argument(
         "--epochs",
         type=int,
         required=True,
@@ -74,7 +79,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(
         params=model.parameters(),
         lr=args.learning_rate,
-        weight_decay=1e-03,
+        weight_decay=1e-04,
     )
 
     dataset=TensorDataset(
@@ -110,39 +115,93 @@ if __name__ == "__main__":
         shuffle=False,
     )
 
-    for epoch in range(args.epochs):
+    if args.checkpoint != 0:
+        checkpoint = torch.load(
+            f"./model_save/vae_epoch_{args.epoch}.pt"
+        )
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        print(f"Starting Training Loop from epoch {args.checkpoint}...")
+
+    else:
+        print("Starting Training Loop...")
+
+    for epoch in range(args.checkpoint, args.epochs):
         model.train()
-        train_loss = 0.
+        train_loss, recon_loss, kld_loss = 0., 0., 0.
         for datas in train_loader:
             optimizer.zero_grad()
             datas = datas.to(device)
             datas_hat, datas, mu, log_var = model(datas)
-            criterion = model.loss_fn(
+
+            loss = model.loss_fn(
                 x_hat=datas_hat,
                 x=datas,
                 mu=mu,
                 log_var=log_var,
             )['Loss']
-            criterion.backward()
+
+            recon = model.loss_fn(
+                x_hat=datas_hat,
+                x=datas,
+                mu=mu,
+                log_var=log_var,
+            )['Reconstruction Loss']
+
+            kld = model.loss_fn(
+                x_hat=datas_hat,
+                x=datas,
+                mu=mu,
+                log_var=log_var,
+            )['KLD Loss']
+
+            loss.backward()
             optimizer.step()
-            train_loss += criterion
-        print(f"Epoch {epoch + 1}: Train Loss = {train_loss:.4e}")
+            train_loss += loss
+            recon_loss += recon
+            kld_loss += kld
+
+        print(f"Epoch {epoch + 1}: Sum of Train Loss = {train_loss:.4e}")
+        print(f"Epoch {epoch + 1}: Sum of Recon Loss = {recon_loss:.4e}")
+        print(f"Epoch {epoch + 1}: Sum of KLD Loss = {kld_loss:.4e}")
 
         if (epoch + 1) % args.save_interval == 0:
             model.eval()
-            val_loss = 0.
+            val_loss, val_recon_loss, val_kld_loss = 0., 0., 0.
             for datas in val_loader:
                 datas = datas.to(device)
                 with torch.no_grad():
                     datas_hat, datas, mu, log_var = model(datas)
-                    criterion = model.loss_fn(
+
+                    loss = model.loss_fn(
                         x_hat=datas_hat,
                         x=datas,
                         mu=mu,
                         log_var=log_var,
                     )['Loss']
-                    val_loss += criterion
-            print(f"Epoch {epoch + 1}: Validation Loss = {val_loss:.4e}")
+
+                    recon = model.loss_fn(
+                        x_hat=datas_hat,
+                        x=datas,
+                        mu=mu,
+                        log_var=log_var,
+                    )['Reconstruction Loss']
+
+                    kld = model.loss_fn(
+                        x_hat=datas_hat,
+                        x=datas,
+                        mu=mu,
+                        log_var=log_var,
+                    )['KLD Loss']
+
+                    val_loss += loss
+                    val_recon_loss += recon
+                    val_kld_loss += kld
+
+            print(f"Sum of Val Loss = {val_loss:.4e}")
+            print(f"Sum of Val Recon Loss = {val_recon_loss:.4e}")
+            print(f"Sum of Val KLD Loss = {val_kld_loss:.4e}")
+
             torch.save(
                 {
                     'model_state_dict': model.state_dict(),
