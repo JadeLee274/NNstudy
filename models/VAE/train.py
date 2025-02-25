@@ -7,13 +7,14 @@ from torchvision import transforms as T
 from vae import VAE
 from tensordataset import TensorDataset
 from typing import *
+DATA_ROOT = "/data/home/tmdals274/NNstudy/data/celeba/img_align_celeba"
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--in_channels",
         type=int,
-        required=True,
         default=3,
     )
     parser.add_argument(
@@ -24,29 +25,26 @@ if __name__ == "__main__":
     parser.add_argument(
         "--hidden_dim",
         type=int,
-        required=True,
         default=128,
     )
     parser.add_argument(
         "--input_size",
         type=int,
-        required=True,
         default=64,
     )
     parser.add_argument(
         "--learning_rate",
         type=float,
-        required=True,
+        default=1e-4,
     )
     parser.add_argument(
         "--data_root",
         type=str,
-        required=True,
+        default=DATA_ROOT,
     )
     parser.add_argument(
         "--batch_size",
         type=int,
-        required=True,
         default=64,
     )
     parser.add_argument(
@@ -57,12 +55,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--epochs",
         type=int,
-        required=True,
+        default=200,
     )
     parser.add_argument(
         "--save_interval",
         type=int,
-        required=True,
+        default=10,
     )
     args = parser.parse_args()
 
