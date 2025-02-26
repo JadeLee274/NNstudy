@@ -46,7 +46,11 @@ if __name__ == "__main__":
         type=int,
         default=1,
     )
-
+    args.add_argument(
+        "--checkpoint",
+        type=int,
+        default=0,
+    )
     args.parse_args()
 
     dataframe = pd.read_csv(args.data_root)
@@ -122,9 +126,16 @@ if __name__ == "__main__":
         lr=1e-3,
     )
 
-    print("Starting Training Loop... \n")
+    if args.checkpoint != 0:
+        checkpoint = torch.load(
+            f"./imdb_train_save/imdb_lstm_{args.checkpoint}.pt"
+        )
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-    for epoch in range(args.epochs):
+    print(f"Starting Training Loop from {args.checkpoint + 1}... \n")
+
+    for epoch in range(args.checkpoint, args.epochs):
         model.train()
         total_loss = 0
 
