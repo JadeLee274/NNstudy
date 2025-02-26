@@ -25,7 +25,7 @@ class LSTMClassifier(nn.Module):
             in_features=hidden_dim,
             out_features=output_dim,
         )
-        self.sigmoid = nn.Sigmoid
+        self.sigmoid = nn.Sigmoid()
 
     def forward(
             self,
