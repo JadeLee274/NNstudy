@@ -4,10 +4,10 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms as T
+from torch.optim import lr_scheduler as scheduler
 from vae import VAE
 from tensordataset import TensorDataset
 from typing import *
-DATA_ROOT = "/data/home/tmdals274/NNstudy/data/celeba/img_align_celeba"
 
 
 if __name__ == "__main__":
@@ -35,12 +35,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=1e-4,
+        default=10,
     )
     parser.add_argument(
         "--data_root",
         type=str,
-        default=DATA_ROOT,
+        required=True,
     )
     parser.add_argument(
         "--batch_size",
@@ -78,6 +78,13 @@ if __name__ == "__main__":
         params=model.parameters(),
         lr=args.learning_rate,
         weight_decay=1e-04,
+    )
+
+    scheduler = scheduler.LambdaLR(
+        optimizer=optimizer,
+        lr_lambda=lambda epoch: 0.95 ** epoch,
+        last_epoch=-1,
+        verbose=False,
     )
 
     dataset=TensorDataset(
@@ -158,6 +165,8 @@ if __name__ == "__main__":
             train_loss += loss
             recon_loss += recon
             kld_loss += kld
+
+        scheduler.step()
 
         print(f"Epoch {epoch + 1}: Sum of Train Loss = {train_loss:.4e}")
         print(f"Epoch {epoch + 1}: Sum of Recon Loss = {recon_loss:.4e}")
