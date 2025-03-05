@@ -6,6 +6,7 @@
 *.docx
 *.csv
 *.txt
+*.png
 
 # ignore certain folder under all subdirectories
 __pycache__/
