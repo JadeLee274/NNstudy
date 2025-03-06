@@ -2,50 +2,55 @@ import os
 import argparse
 import torch
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 from torchvision import transforms as T
+from torchvision.utils import save_image, make_grid
 from torch.optim import lr_scheduler as scheduler
+import matplotlib.pyplot as plt
+from typing import *
 from vae import VAE
 from tensordataset import TensorDataset
-from typing import *
+DATA_ROOT = '/data/home/tmdals274/NNstudy/data'
+OUTPUT_DIR = './outputs'
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--in_channels",
+        "--in-channels",
         type=int,
         default=3,
     )
     parser.add_argument(
-        "--out_channels_list",
+        "--out-channels-list",
         type=list,
         default=[16, 32, 64, 128, 256],
     )
     parser.add_argument(
-        "--hidden_dim",
+        "--hidden-dim",
         type=int,
         default=128,
     )
     parser.add_argument(
-        "--input_size",
+        "--input-size",
         type=int,
         default=64,
     )
     parser.add_argument(
-        "--learning_rate",
+        "--learning-rate",
         type=float,
-        default=10,
+        default=1e-3,
     )
     parser.add_argument(
-        "--data_root",
+        "--data-root",
         type=str,
-        required=True,
+        default=os.path.join(DATA_ROOT, 'cifar10'),
     )
     parser.add_argument(
-        "--batch_size",
+        "--batch-size",
         type=int,
-        default=64,
+        default=1024,
     )
     parser.add_argument(
         "--checkpoint",
@@ -55,10 +60,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--epochs",
         type=int,
-        default=200,
+        default=1000,
     )
     parser.add_argument(
-        "--save_interval",
+        "--save-interval",
         type=int,
         default=10,
     )
@@ -77,14 +82,19 @@ if __name__ == "__main__":
     optimizer = optim.Adam(
         params=model.parameters(),
         lr=args.learning_rate,
-        weight_decay=1e-04,
+        weight_decay=1e-4,
     )
 
-    scheduler = scheduler.LambdaLR(
+    MIN_LR = args.learning_rate * 0.01
+
+    def lr_lambda(epoch: int) -> float:
+        lr = 0.99 ** epoch
+        lr = max(lr, MIN_LR)
+        return lr
+
+    sched = scheduler.LambdaLR(
         optimizer=optimizer,
-        lr_lambda=lambda epoch: 0.95 ** epoch,
-        last_epoch=-1,
-        verbose=False,
+        lr_lambda=lr_lambda,
     )
 
     dataset=TensorDataset(
@@ -94,30 +104,20 @@ if __name__ == "__main__":
                 T.Resize(
                     size=args.input_size,
                 ),
-                T.CenterCrop(
-                    size=args.input_size,
-                ),
-                T.ToTensor()
+                T.ToTensor(),
+                T.Normalize(
+                    mean=(0.4914, 0.4822, 0.4465),
+                    std=(0.247, 0.243, 0.261),
+                )
             ]
         )
     )
 
-    train_set, val_set = random_split(
+    dataloader = DataLoader(
         dataset=dataset,
-        lengths=[0.9, 0.1],
-        generator=torch.manual_seed(42),
-    )
-
-    train_loader = DataLoader(
-        dataset=train_set,
-        batch_size=64,
+        batch_size=args.batch_size,
         shuffle=True,
-    )
-
-    val_loader = DataLoader(
-        dataset=val_set,
-        batch_size=64,
-        shuffle=False,
+        drop_last=True,
     )
 
     if args.checkpoint != 0:
@@ -133,87 +133,62 @@ if __name__ == "__main__":
 
     for epoch in range(args.checkpoint, args.epochs):
         model.train()
-        train_loss, recon_loss, kld_loss = 0., 0., 0.
-        for datas in train_loader:
+        avg_train_loss, avg_recon_loss, avg_kld_loss = 0, 0, 0
+        for datas in dataloader:
             optimizer.zero_grad()
             datas = datas.to(device)
             datas_hat, datas, mu, log_var = model(datas)
 
-            loss = model.loss_fn(
+            loss_dict = model.loss_fn(
                 x_hat=datas_hat,
                 x=datas,
                 mu=mu,
                 log_var=log_var,
-            )['Loss']
-
-            recon = model.loss_fn(
-                x_hat=datas_hat,
-                x=datas,
-                mu=mu,
-                log_var=log_var,
-            )['Reconstruction Loss']
-
-            kld = model.loss_fn(
-                x_hat=datas_hat,
-                x=datas,
-                mu=mu,
-                log_var=log_var,
-            )['KLD Loss']
+            )
+            loss = loss_dict['Loss']
+            recon_loss = loss_dict['Reconstruction Loss']
+            kld_loss = loss_dict['KLD Loss']
 
             loss.backward()
             optimizer.step()
-            train_loss += loss
-            recon_loss += recon
-            kld_loss += kld
+            avg_train_loss += loss
+            avg_recon_loss += recon_loss
+            avg_kld_loss += kld_loss
 
-        scheduler.step()
+        avg_train_loss /= len(dataloader)
+        avg_recon_loss /= len(dataloader)
+        avg_kld_loss /= len(dataloader)
+        sched.step()
 
-        print(f"Epoch {epoch + 1}: Sum of Train Loss = {train_loss:.4e}")
-        print(f"Epoch {epoch + 1}: Sum of Recon Loss = {recon_loss:.4e}")
-        print(f"Epoch {epoch + 1}: Sum of KLD Loss = {kld_loss:.4e}")
+        print(f"Epoch {epoch + 1:03d}: Train = {avg_train_loss:.4e}")
+        print(f"Epoch {epoch + 1:03d}: Recon = {avg_recon_loss:.4e}")
+        print(f"Epoch {epoch + 1:03d}: KLD   = {avg_kld_loss:.4e}")
+        print('=' * 50)
 
         if (epoch + 1) % args.save_interval == 0:
-            model.eval()
-            val_loss, val_recon_loss, val_kld_loss = 0., 0., 0.
-            for datas in val_loader:
-                datas = datas.to(device)
-                with torch.no_grad():
-                    datas_hat, datas, mu, log_var = model(datas)
-
-                    loss = model.loss_fn(
-                        x_hat=datas_hat,
-                        x=datas,
-                        mu=mu,
-                        log_var=log_var,
-                    )['Loss']
-
-                    recon = model.loss_fn(
-                        x_hat=datas_hat,
-                        x=datas,
-                        mu=mu,
-                        log_var=log_var,
-                    )['Reconstruction Loss']
-
-                    kld = model.loss_fn(
-                        x_hat=datas_hat,
-                        x=datas,
-                        mu=mu,
-                        log_var=log_var,
-                    )['KLD Loss']
-
-                    val_loss += loss
-                    val_recon_loss += recon
-                    val_kld_loss += kld
-
-            print(f"Sum of Val Loss = {val_loss:.4e}")
-            print(f"Sum of Val Recon Loss = {val_recon_loss:.4e}")
-            print(f"Sum of Val KLD Loss = {val_kld_loss:.4e}")
-
             torch.save(
                 {
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                 },
-                f'./model_save/vae_epoch_{epoch + 1}.pt',
+                f'./model_save/cifar10_vae/vae_epoch_{epoch + 1}.pt',
             )
-            model.train()
+
+            with torch.no_grad():
+                model.eval()
+                for img in dataloader:
+                    img = img.to(device)
+                    recon = model(img)[0]
+                    sample = model.sample(img.shape[0], device)
+                    recon_path = os.path.join(
+                        OUTPUT_DIR,
+                        f'epoch_{epoch + 1:03d}_recon.png',
+                    )
+                    sample_path = os.path.join(
+                        OUTPUT_DIR,
+                        f'epoch_{epoch + 1:03d}_sample.png',
+                    )
+                    save_image(recon, recon_path)
+                    save_image(sample, sample_path)
+                    break
+            

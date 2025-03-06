@@ -2,17 +2,16 @@ from typing import *
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-Matrix = torch.Tensor
 Tensor = torch.Tensor
 
 
 class VAE(nn.Module):
     def __init__(
-            self,
-            in_channels: int,
-            out_channels_list: List,
-            hidden_dim: int,
-            input_size: int,
+        self,
+        in_channels: int,
+        out_channels_list: List,
+        hidden_dim: int,
+        input_size: int,
     ) -> None:
         super(VAE, self).__init__()
         self.input_size = input_size
@@ -112,14 +111,25 @@ class VAE(nn.Module):
                     kernel_size=3,
                     stride=1,
                     padding=1,
-                )
+                ),
             )
         )
         self.decoder = nn.Sequential(*dec_list)
 
+        self.init_weights()
+
+    def init_weights(self) -> None:
+        for m in self.parameters():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight)
+                nn.init.zeros_(m.bias)
+
     def encode(
-            self,
-            x: Tensor,
+        self,
+        x: Tensor,
     ) -> Tuple[Tensor, Tensor]:
         out = self.encoder(x)
         out = out.view(out.shape[0], -1)
@@ -128,8 +138,8 @@ class VAE(nn.Module):
         return mu, log_var
     
     def decode(
-            self,
-            z: Matrix,
+        self,
+        z: Tensor,
     ) -> Tensor:
         out = self.fc_dec(z)
         out = out.view(
@@ -142,30 +152,30 @@ class VAE(nn.Module):
         return reconstrucsion
     
     def reparametrization(
-            self,
-            mu: Matrix,
-            log_var: Matrix,
-    ) -> Matrix:
+        self,
+        mu: Tensor,
+        log_var: Tensor,
+    ) -> Tensor:
         std = torch.exp(0.5 * log_var)
         eps = torch.randn_like(mu)
         z = mu + (std * eps)
         return z
     
     def forward(
-            self,
-            x: Tensor,
-    ) -> List[Tensor]:
+        self,
+        x: Tensor,
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         mu, log_var = self.encode(x)
         z = self.reparametrization(mu, log_var)
         return self.decode(z), x, mu, log_var
     
     def loss_fn(
-            self,
-            x_hat: Tensor,
-            x: Tensor,
-            mu: Matrix,
-            log_var: Matrix,
-            kld_weight: float = 1,
+        self,
+        x_hat: Tensor,
+        x: Tensor,
+        mu: Tensor,
+        log_var: Tensor,
+        kld_weight: float = 1e-3,
     ) -> Dict[str, Tensor]:
         reconstruction_loss = F.mse_loss(x_hat, x)
         kld_loss = torch.mean(
@@ -183,18 +193,16 @@ class VAE(nn.Module):
         }
     
     def sample(
-            self,
-            num_samples: int,
+        self,
+        num_samples: int,
+        device: torch.device,
     ) -> Tensor:
-        z = torch.randn(
-            num_samples,
-            self.hidden_dim
-        )
+        z = torch.randn(num_samples, self.hidden_dim).to(device)
         samples = self.decode(z)
         return samples
     
     def generate(
-            self,
-            x: Tensor,
+        self,
+        x: Tensor,
     ) -> Tensor:
         return self.forward(x)[0]
