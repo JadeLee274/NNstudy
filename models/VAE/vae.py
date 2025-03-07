@@ -175,7 +175,7 @@ class VAE(nn.Module):
         x: Tensor,
         mu: Tensor,
         log_var: Tensor,
-        kld_weight: float = 1e-3,
+        kld_weight: float = 2e-4,
     ) -> Dict[str, Tensor]:
         reconstruction_loss = F.mse_loss(x_hat, x)
         kld_loss = torch.mean(

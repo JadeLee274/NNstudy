@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--out-channels-list",
         type=list,
-        default=[16, 32, 64, 128, 256],
+        default=[32, 64, 128, 256, 512],
     )
     parser.add_argument(
         "--hidden-dim",
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--learning-rate",
         type=float,
-        default=1e-3,
+        default=5e-3,
     )
     parser.add_argument(
         "--data-root",
@@ -82,13 +82,12 @@ if __name__ == "__main__":
     optimizer = optim.Adam(
         params=model.parameters(),
         lr=args.learning_rate,
-        weight_decay=1e-4,
     )
 
-    MIN_LR = args.learning_rate * 0.01
+    MIN_LR = args.learning_rate * 0.1
 
     def lr_lambda(epoch: int) -> float:
-        lr = 0.99 ** epoch
+        lr = 0.95 ** (epoch // 5)
         lr = max(lr, MIN_LR)
         return lr
 
