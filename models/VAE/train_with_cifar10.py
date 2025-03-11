@@ -1,22 +1,26 @@
 import os
 import argparse
 import torch
-import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
 from torchvision.utils import save_image, make_grid
 from torch.optim import lr_scheduler as scheduler
 import matplotlib.pyplot as plt
 from typing import *
-from vae import VAE
+from vae import *
 from tensordataset import TensorDataset
 DATA_ROOT = '/data/home/tmdals274/NNstudy/data'
-OUTPUT_DIR = './outputs'
+OUTPUT_DIR = './outputs_cifar10_2'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--gpu",
+        type=int,
+        default=0,
+    )
     parser.add_argument(
         "--in-channels",
         type=int,
@@ -25,7 +29,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--out-channels-list",
         type=list,
-        default=[32, 64, 128, 256, 512],
+        default=[64, 128, 256, 512, 1024],
     )
     parser.add_argument(
         "--hidden-dim",
@@ -35,12 +39,32 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input-size",
         type=int,
-        default=64,
+        default=32,
     )
     parser.add_argument(
         "--learning-rate",
         type=float,
         default=5e-3,
+    )
+    parser.add_argument(
+        "--sched-gamma",
+        type=float,
+        default=0.99,
+    )
+    parser.add_argument(
+        "--sched-epoch",
+        type=int,
+        default=5,
+    )
+    parser.add_argument(
+        "--min-lr-rate",
+        type=float,
+        default=0.1
+    )
+    parser.add_argument(
+        "--kld-weight",
+        type=float,
+        default=2e-4
     )
     parser.add_argument(
         "--data-root",
@@ -50,7 +74,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=1024,
+        default=2048,
     )
     parser.add_argument(
         "--checkpoint",
@@ -69,30 +93,31 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
 
     model = VAE(
         in_channels=args.in_channels,
         out_channels_list=args.out_channels_list,
         hidden_dim=args.hidden_dim,
         input_size=args.input_size,
+        kld_weight=args.kld_weight
     )
     model = model.to(device)
 
-    optimizer = optim.Adam(
+    optim = torch.optim.Adam(
         params=model.parameters(),
         lr=args.learning_rate,
     )
 
-    MIN_LR = args.learning_rate * 0.1
+    MIN_LR = args.learning_rate * args.min_lr_rate
 
     def lr_lambda(epoch: int) -> float:
-        lr = 0.95 ** (epoch // 5)
+        lr = args.sched_gamma ** (epoch // args.sched_epoch)
         lr = max(lr, MIN_LR)
         return lr
 
     sched = scheduler.LambdaLR(
-        optimizer=optimizer,
+        optimizer=optim,
         lr_lambda=lr_lambda,
     )
 
@@ -121,10 +146,11 @@ if __name__ == "__main__":
 
     if args.checkpoint != 0:
         checkpoint = torch.load(
-            f"./model_save/vae_epoch_{args.epoch}.pt"
+            f"./model_save/cifar10_vae_2/vae_epoch_{args.checkpoint}.pt"
         )
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        model.load_state_dict(checkpoint['model'])
+        optim.load_state_dict(checkpoint['optim'])
+        sched.load_state_dict(checkpoint['sched'])
         print(f"Starting Training Loop from epoch {args.checkpoint}...")
 
     else:
@@ -134,7 +160,7 @@ if __name__ == "__main__":
         model.train()
         avg_train_loss, avg_recon_loss, avg_kld_loss = 0, 0, 0
         for datas in dataloader:
-            optimizer.zero_grad()
+            optim.zero_grad()
             datas = datas.to(device)
             datas_hat, datas, mu, log_var = model(datas)
 
@@ -149,7 +175,7 @@ if __name__ == "__main__":
             kld_loss = loss_dict['KLD Loss']
 
             loss.backward()
-            optimizer.step()
+            optim.step()
             avg_train_loss += loss
             avg_recon_loss += recon_loss
             avg_kld_loss += kld_loss
@@ -167,10 +193,11 @@ if __name__ == "__main__":
         if (epoch + 1) % args.save_interval == 0:
             torch.save(
                 {
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
+                    'model': model.state_dict(),
+                    'optim': optim.state_dict(),
+                    'sched': sched.state_dict(),
                 },
-                f'./model_save/cifar10_vae/vae_epoch_{epoch + 1}.pt',
+                f'./model_save/cifar10_vae_2/vae_epoch_{epoch + 1}.pt',
             )
 
             with torch.no_grad():

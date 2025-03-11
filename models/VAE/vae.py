@@ -9,15 +9,17 @@ class VAE(nn.Module):
     def __init__(
         self,
         in_channels: int,
-        out_channels_list: List,
+        out_channels_list: List[int],
         hidden_dim: int,
         input_size: int,
+        kld_weight: float = 2e-04,
     ) -> None:
-        super(VAE, self).__init__()
+        super().__init__()
         self.input_size = input_size
         self.in_channels = in_channels
         self.out_channels_list = out_channels_list
         self.hidden_dim = hidden_dim
+        self.kld_weight = kld_weight
 
         encoder_list = []
         channel = in_channels
@@ -175,7 +177,6 @@ class VAE(nn.Module):
         x: Tensor,
         mu: Tensor,
         log_var: Tensor,
-        kld_weight: float = 2e-4,
     ) -> Dict[str, Tensor]:
         reconstruction_loss = F.mse_loss(x_hat, x)
         kld_loss = torch.mean(
@@ -185,7 +186,7 @@ class VAE(nn.Module):
             ),
             dim=0,
         )
-        loss = reconstruction_loss + kld_weight * kld_loss
+        loss = reconstruction_loss + self.kld_weight * kld_loss
         return {
             'Loss': loss,
             'Reconstruction Loss': reconstruction_loss.detach(),
