@@ -103,7 +103,7 @@ fake_label = 0.
 
 optimizer_G = optim.Adam(
     params=netG.parameters(),
-    lr=args.learning_rate,
+    lr=(5 * args.learning_rate),
     betas=(0.5, 0.999),
 )
 
