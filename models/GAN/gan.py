@@ -11,8 +11,21 @@ class Generator(nn.Module):
         latent_dim: int = 128,
         num_doublesize: int = 5,
         num_filters: int = 64,
+        final_act: str = 'tanh'
     ) -> None:
         super().__init__()
+
+        if final_act == None:
+            self.final_act = nn.Identity()
+        elif final_act == 'sigmoid':
+            self.final_act = nn.Sigmoid()
+        elif final_act == 'tanh':
+            self.final_act = nn.Tanh()
+        elif final_act == 'relu':
+            self.final_act = nn.ReLU()
+        elif final_act == 'leakyrelu':
+            self.final_act = nn.LeakyReLU()
+
         param_list = [
             nn.Sequential(
                 nn.ConvTranspose2d(
@@ -24,7 +37,7 @@ class Generator(nn.Module):
                     output_padding=1,
                 ),
                 nn.BatchNorm2d(num_filters * (2 ** (num_doublesize - 2))),
-                nn.LeakyReLU(),
+                nn.ReLU(inplace=True),
             ),
         ]
 
@@ -40,7 +53,7 @@ class Generator(nn.Module):
                         output_padding=1,
                     ),
                     nn.BatchNorm2d(num_filters * (2 ** (num_doublesize - 3 - i))),
-                    nn.LeakyReLU(),
+                    nn.ReLU(inplace=True),
                 ),
             )
         
@@ -54,8 +67,7 @@ class Generator(nn.Module):
                     padding=1,
                     output_padding=1,
                 ),
-                nn.BatchNorm2d(out_channels),
-                nn.LeakyReLU(),
+                self.final_act,
             ),
         )
 
@@ -65,11 +77,19 @@ class Generator(nn.Module):
 
     def init_weights(self) -> None:
         for m in self.parameters():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_normal(m.weight)
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                nn.init.normal_(
+                    tensor=m.weight.data,
+                    mean=0.0,
+                    std=0.02,
+                )
                 nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.ConvTranspose2d):
-                nn.init.kaiming_normal_(m.weight)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.normal_(
+                    tensor=m.weight.data,
+                    mean=1.0,
+                    std=0.02,
+                )
                 nn.init.zeros_(m.bias)
 
     def forward(
@@ -86,8 +106,21 @@ class Discriminator(nn.Module):
         in_channels: int = 3,
         num_halfsize: int = 5,
         num_filters: int = 64,
+        final_act: str = 'sigmoid'
     ) -> None:
         super().__init__()
+
+        if final_act == None:
+            self.final_act = nn.Identity()
+        elif final_act == 'sigmoid':
+            self.final_act = nn.Sigmoid()
+        elif final_act == 'tanh':
+            self.final_act = nn.Tanh()
+        elif final_act == 'relu':
+            self.final_act = nn.ReLU()
+        elif final_act == 'leakyrelu':
+            self.final_act = nn.LeakyReLU()
+
         param_list = [
             nn.Sequential(
                 nn.Conv2d(
@@ -97,7 +130,10 @@ class Discriminator(nn.Module):
                     stride=2,
                     padding=1,
                 ),
-                nn.LeakyReLU(),
+                nn.LeakyReLU(
+                    negative_slope=0.2,
+                    inplace=True,
+                ),
             ),
         ]
 
@@ -112,7 +148,10 @@ class Discriminator(nn.Module):
                         padding=1,
                     ),
                     nn.BatchNorm2d(num_filters * (2 ** (i + 1))),
-                    nn.LeakyReLU(),
+                    nn.LeakyReLU(
+                        negative_slope=0.2,
+                        inplace=True,
+                    ),
                 ),
             )
         
@@ -125,6 +164,7 @@ class Discriminator(nn.Module):
                     stride=2,
                     padding=1,
                 ),
+                self.final_act,
             )
         )
 
@@ -134,13 +174,21 @@ class Discriminator(nn.Module):
 
     def init_weights(self) -> None:
         for m in self.parameters():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight)
-                nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight)
-                nn.init.zeros_(m.bias)
-    
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                nn.init.normal_(
+                    tensor=m.weight.data,
+                    mean=0.0,
+                    std=0.02,
+                )
+                nn.init.zeros_(m.bias.data)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.normal_(
+                    tensor=m.weight.data,
+                    mean=1.0,
+                    std=0.02,
+                )
+                nn.init.zeros_(m.bias.data)
+
     def forward(
             self,
             x: Tensor

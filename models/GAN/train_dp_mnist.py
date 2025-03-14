@@ -16,12 +16,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--batch-size",
     type=int,
-    default=64,
+    default=128,
 )
 parser.add_argument(
     "--latent-dim",
     type=int,
-    default=128,
+    default=100,
 )
 parser.add_argument(
     "--learning-rate",
@@ -31,7 +31,17 @@ parser.add_argument(
 parser.add_argument(
     "--epochs",
     type=int,
-    default=200,
+    default=100,
+)
+parser.add_argument(
+    "--start-train",
+    type=int,
+    default=0,
+)
+parser.add_argument(
+    "--save-interval",
+    type=int,
+    default=10,
 )
 parser.add_argument(
     "--num-gpu",
@@ -49,6 +59,7 @@ mnist_set = MNIST(
         [
             T.Resize(32),
             T.ToTensor(),
+            T.Normalize((0.5,), (0.5,))
         ]
     )
 )
@@ -65,12 +76,14 @@ netG = Generator(
     out_channels=1,
     num_filters=64,
     num_doublesize=5,
+    final_act='tanh',
 ).to(device)
 
 netD = Discriminator(
     in_channels=1,
     num_filters=64,
     num_halfsize=5,
+    final_act='sigmoid',
 ).to(device)
 
 if (device.type == 'cuda') and (args.num_gpu > 1):
@@ -83,7 +96,7 @@ if (device.type == 'cuda') and (args.num_gpu > 1):
         device_ids=list(range(args.num_gpu))
     )
 
-criterion = nn.BCEWithLogitsLoss()
+criterion = nn.BCELoss()
 
 real_label = 1.
 fake_label = 0.
@@ -102,7 +115,24 @@ optimizer_D = optim.Adam(
 
 
 def train() -> None:
-    for epoch in range(args.epochs):
+    if args.start_train != 0:
+        checkpoint_G = torch.load(
+            f"./model_save/mnist/mnist_generator_epoch_{(args.start_train)}.pt"
+        )
+        checkpoint_D = torch.load(
+            f"./model_save/mnist/mnist_discriminator_epoch_{args.start_train}.pt"
+        )
+        netG.load_state_dict(checkpoint_G['model'])
+        netD.load_state_dict(checkpoint_D['model'])
+        optimizer_G.load_state_dict(checkpoint_G['optim'])
+        optimizer_D.load_state_dict(checkpoint_D['optim'])
+    
+        print(f"Starting Training Loop From Epoch {args.start_train}...")
+    
+    else:
+        print("Starting Training Loop...")
+
+    for epoch in range(args.start_train, args.epochs):
         for i, (data, _) in enumerate(dataloader):
             optimizer_D.zero_grad()
             real_data = data.to(device)
@@ -118,12 +148,13 @@ def train() -> None:
             D_err_real.backward()
             D_x = output_real.mean().item()
 
-            noise = torch.randn(args.batch_size, args.latent_dim, 1, 1)
+            noise = torch.randn(args.batch_size, args.latent_dim, 1, 1).to(device)
 
             fake_data = netG(noise)
             label.fill_(fake_label)
             output_fake_detach = netD(fake_data.detach()).view(-1)
             D_err_fake = criterion(output_fake_detach, label)
+            D_err_fake.backward()
             D_G_z1 = output_fake_detach.mean().item()
 
             D_err = D_err_real + D_err_fake
@@ -137,16 +168,41 @@ def train() -> None:
             D_G_z2 = output_fake.mean().item()
             optimizer_G.step()
 
-            if (i + 1) % 100 == 0:
+            if (i + 1) % 200 == 0:
                 print(f"Epoch {epoch + 1} | Iter {i + 1} : Loss_D = {D_err:.3e}, Loss_G = {G_err:.3e}, D(x) = {D_x:.3e}, D(G(z)) = {D_G_z1:.3e} / {D_G_z2:.3e}")
-                fixed_noise = torch.randn(args.batch_size, args.latent_dim, 1, 1)
-                save_image(
-                    tensor=netG(fixed_noise).detach().cpu(),
-                    fp=os.path.join(
-                        './output_mnist',
-                        f'./mnist_epoch_{(epoch + 1):03d}_iter_{(i + 1):04d}.png'
-                    )
-                )
+        
+        netG.eval()
+        fixed_noise = torch.randn(args.batch_size, args.latent_dim, 1, 1).to(device)
+        save_image(
+            tensor=netG(fixed_noise).detach().cpu(),
+            fp=os.path.join(
+                './output/mnist',
+                f'./mnist_epoch_{(epoch + 1):03d}.png'
+            )
+        )
+        netG.train()
+
+        if (epoch + 1) % args.save_interval == 0:
+            torch.save(
+                obj={
+                    'model': netG.state_dict(),
+                    'optim': optimizer_G.state_dict(),
+                },
+                f=os.path.join(
+                    './model_save/mnist',
+                    f'mnist_generator_epoch_{epoch + 1:03d}.pt'
+                ),
+            )
+            torch.save(
+                obj={
+                    'model': netD.state_dict(),
+                    'optim': optimizer_D.state_dict(),
+                },
+                f=os.path.join(
+                    './model_save/mnist',
+                    f'mnist_discriminator_epoch_{epoch + 1:03d}.pt'
+                ),
+            )
 
 if __name__ == "__main__":
     train()
