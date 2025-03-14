@@ -3,28 +3,21 @@ import argparse
 import torch
 import tensorboard
 import torch.optim as optim
+import torch.distributed as dist
+import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
+from torch.utils.data import DistributedSampler
+from torch.nn.parallel import DistributedDataParallel as DDP
 import torchvision.transforms as T
 from torchvision.utils import save_image
 from torchvision.datasets import MNIST
 from gan import *
-from ddp_setup import *
 ROOT = '/data/home/tmdals274/NNstudy/data'
 OUTPUT_DIR = './output_mnist'
 
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument(
-    "--master_addr",
-    type=str,
-    required=True,
-)
-parser.add_argument(
-    "--master-port",
-    type=str,
-    required=True,
-)
 parser.add_argument(
     "--backend",
     type=str,
@@ -61,28 +54,44 @@ args = parser.parse_args()
 def train(
     rank: int,
     world_size: int,
+    args,
 ) -> None:
-    setup(rank, world_size)
 
-    sampler = DistributedSampler(
-        dataset=mnist_set,
-        num_replicas=world_size,
+    os.environ['NCCL_SOCKET_IFNAME'] = 'lo'
+    os.environ['MASTER_ADDR'] = '127.0.0.1'
+    os.environ['MASTER_PORT'] = '29500'
+    dist.init_process_group(
+        backend="nccl",
+        init_method='tcp://127.0.0.1:29500',
+        world_size=world_size,
         rank=rank,
-    )
+     )    
+    
+    torch.cuda.set_device(rank)
 
     mnist_set = MNIST(
         root=ROOT,
         download=False,
         train=True,
-        transform=T.ToTensor(),
+        transform=T.Compose(
+            [
+                T.Resize(32),
+                T.ToTensor(),
+            ]
+        )
+    )
+
+    sampler = DistributedSampler(
+        dataset=mnist_set,
+        num_replicas=world_size,
+        rank=rank,
+        shuffle=True,
     )
 
     dataloader = DataLoader(
         dataset=mnist_set,
         batch_size=args.batch_size,
         sampler=sampler,
-        num_workers=2,
-        pin_memory=True,
     )
 
     Gen = Generator(
@@ -90,20 +99,18 @@ def train(
         latent_dim=args.latent_dim,
         num_doublesize=5,
         n_filters=64,
-    )
+    ).to(rank)
 
     Disc = Discriminator(
         in_channels=1,
         num_halfsize=5,
         num_filters=64,
-    )
+    ).to(rank)
 
-    Gen = Gen.to(rank)
     Gen = DDP(Gen, device_ids=[rank])
-    Disc = Disc.to(rank)
     Disc = DDP(Disc, device_ids=[rank])
     
-    criterion = nn.BCELoss().to(rank)
+    criterion = nn.BCELoss()
 
     optimizer_g = optim.Adam(
         params=Gen.parameters(),
@@ -115,8 +122,8 @@ def train(
         lr=args.learning_rate,
     )
 
-    real_label = 1
-    fake_label = 0
+    real_label = 1.
+    fake_label = 0.
 
     for epoch in range(args.epochs):
         sampler.set_epoch(epoch)
@@ -127,17 +134,17 @@ def train(
             label = torch.full(
                 size=(batch_size,),
                 fill_value=real_label,
-                device=rank,
-            )
-            output = Disc(real_data)
+            ).to(rank)
+            output = Disc(real_data).squeeze()
+            print(output.dtype, label.dtype)
             disc_err_real = criterion(output, label)
             disc_err_real.backward()
             D_x = output.mean().item()
 
-            noise = torch.randn(batch_size, args.latent_dim, 1, 1, device=rank)
+            noise = torch.randn(batch_size, args.latent_dim, 1, 1).to(rank)
             fake_data = Gen(noise)
             label.fill_(fake_label)
-            output = Disc(fake_data.detach())
+            output = Disc(fake_data.detach()).squeeze()
             disc_err_fake = criterion(output, label)
             disc_err_fake.backward()
             D_G_Z1 = output.mean().item()
@@ -160,7 +167,7 @@ def train(
                 f"D(G(z)) = {D_G_Z1:.4e} / {D_G_Z2:.4e}"
             )
 
-            if i % 100 == 0:
+            if rank == 0 and i % 100 == 0:
                 real_save_path = os.path.join(
                     OUTPUT_DIR, f'{epoch + 1:03d}_iter{i + 1}_real.png'
                 )
@@ -179,22 +186,22 @@ def train(
         if (epoch + 1) % args.save_interval == 0:
             torch.save(
                 {
-                    'gen': Gen.state_dict(),
-                    'disc': Disc.state_dict(),
+                    'gen': Gen.module.state_dict(),
+                    'disc': Disc.module.state_dict(),
                     'optimizer_g': optimizer_g.state_dict(),
                     'optimizer_d': optimizer_d.state_dict(),
                 },
                 f'./model_save/mnist_gan/gan_epoch_{epoch + 1}.pt'
             )
     
-    cleanup()
+    dist.destroy_process_group()
 
 
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     mp.spawn(
         fn=train,
-        args=(world_size,),
+        args=(world_size, args,),
         nprocs=world_size,
         join=True,
     )

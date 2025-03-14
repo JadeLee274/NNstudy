@@ -1,10 +1,5 @@
-import os
-import sys
-import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn.parallel import DistributedDataParallel as DDP
-import torch.nn.functional as F
 from typing import *
 Tensor = torch.Tensor
 
@@ -15,19 +10,20 @@ class Generator(nn.Module):
         out_channels: int = 3,
         latent_dim: int = 128,
         num_doublesize: int = 5,
-        n_filters: int = 64,
+        num_filters: int = 64,
     ) -> None:
+        super().__init__()
         param_list = [
             nn.Sequential(
                 nn.ConvTranspose2d(
                     in_channels=latent_dim,
-                    out_channels=(n_filters * (2 ** (num_doublesize - 2))),
+                    out_channels=(num_filters * (2 ** (num_doublesize - 2))),
                     kernel_size=3,
                     stride=2,
                     padding=1,
                     output_padding=1,
                 ),
-                nn.BatchNorm2d(n_filters * (2 ** (num_doublesize - 2))),
+                nn.BatchNorm2d(num_filters * (2 ** (num_doublesize - 2))),
                 nn.LeakyReLU(),
             ),
         ]
@@ -36,14 +32,14 @@ class Generator(nn.Module):
             param_list.append(
                 nn.Sequential(
                     nn.ConvTranspose2d(
-                        in_channels=(n_filters * (2 ** (num_doublesize - 2 - i))),
-                        out_channels=(n_filters * (2 ** (num_doublesize - 1 - i))),
+                        in_channels=(num_filters * (2 ** (num_doublesize - 2 - i))),
+                        out_channels=(num_filters * (2 ** (num_doublesize - 3 - i))),
                         kernel_size=3,
                         stride=2,
                         padding=1,
                         output_padding=1,
                     ),
-                    nn.BatchNorm2d(n_filters * (2 ** (num_doublesize - 1 - i))),
+                    nn.BatchNorm2d(num_filters * (2 ** (num_doublesize - 3 - i))),
                     nn.LeakyReLU(),
                 ),
             )
@@ -51,7 +47,7 @@ class Generator(nn.Module):
         param_list.append(
             nn.Sequential(
                 nn.ConvTranspose2d(
-                    in_channels=n_filters,
+                    in_channels=num_filters,
                     out_channels=out_channels,
                     kernel_size=3,
                     stride=2,
@@ -91,6 +87,7 @@ class Discriminator(nn.Module):
         num_halfsize: int = 5,
         num_filters: int = 64,
     ) -> None:
+        super().__init__()
         param_list = [
             nn.Sequential(
                 nn.Conv2d(

@@ -10,17 +10,13 @@ from torch.utils.data import DistributedSampler
 def setup(
     rank: int,
     world_size: int,
-    master_addr: str,
-    master_port: str,
 ) -> None:
-    os.environ['MASTER_ADDR'] = master_addr
-    os.environ['MASTER_PORT'] = master_port
+    os.environ['NCCL_SOCKET_IFNAME'] = 'eth0'
+    os.environ['MASTER_ADDR'] = '127.0.0.1'
+    os.environ['MASTER_PORT'] = '29500'
     dist.init_process_group(
         backend="nccl",
+        init_method='tcp://127.0.0.1:29500',
         world_size=world_size,
         rank=rank,
-    )
-
-
-def cleanup() -> None:
-    dist.destroy_process_group()
+     )
