@@ -26,7 +26,7 @@ parser.add_argument(
 parser.add_argument(
     "--learning-rate",
     type=float,
-    default=2e-4,
+    default=1e-4,
 )
 parser.add_argument(
     "--epochs",
@@ -46,7 +46,7 @@ parser.add_argument(
 parser.add_argument(
     "--num-gpu",
     type=int,
-    default=4,
+    default=1,
 )
 args = parser.parse_args()
 
@@ -74,14 +74,14 @@ dataloader = DataLoader(
 netG = Generator(
     latent_dim=args.latent_dim,
     out_channels=1,
-    num_filters=64,
+    num_filters=128,
     num_doublesize=5,
     final_act='tanh',
 ).to(device)
 
 netD = Discriminator(
     in_channels=1,
-    num_filters=64,
+    num_filters=128,
     num_halfsize=5,
     final_act='sigmoid',
 ).to(device)
@@ -103,13 +103,13 @@ fake_label = 0.
 
 optimizer_G = optim.Adam(
     params=netG.parameters(),
-    lr=(5 * args.learning_rate),
+    lr=(2 * args.learning_rate),
     betas=(0.5, 0.999),
 )
 
 optimizer_D = optim.Adam(
     params=netD.parameters(),
-    lr=args.learning_rate,
+    lr=(args.learning_rate),
     betas=(0.5, 0.999),
 )
 
@@ -135,6 +135,7 @@ def train() -> None:
     for epoch in range(args.start_train, args.epochs):
         for i, (data, _) in enumerate(dataloader):
             optimizer_D.zero_grad()
+            optimizer_G.zero_grad()
             real_data = data.to(device)
             batch_size = real_data.size(0)
             label = torch.full(
@@ -143,36 +144,40 @@ def train() -> None:
                 dtype=torch.float,
                 device=device,
             )
+            noise = torch.randn(args.batch_size, args.latent_dim, 1, 1).to(device)
+            fake_data = netG(noise)
             output_real = netD(real_data).view(-1)
             D_err_real = criterion(output_real, label)
             D_err_real.backward()
-            D_x = output_real.mean().item()
 
-            noise = torch.randn(args.batch_size, args.latent_dim, 1, 1).to(device)
-
-            fake_data = netG(noise)
             label.fill_(fake_label)
             output_fake_detach = netD(fake_data.detach()).view(-1)
             D_err_fake = criterion(output_fake_detach, label)
             D_err_fake.backward()
-            D_G_z1 = output_fake_detach.mean().item()
 
             D_err = D_err_real + D_err_fake
-            optimizer_D.step()
+            if epoch >= 3:
+                optimizer_D.step()
 
-            optimizer_G.zero_grad()
             label.fill_(real_label)
             output_fake = netD(fake_data).view(-1)
             G_err = criterion(output_fake, label)
             G_err.backward()
-            D_G_z2 = output_fake.mean().item()
             optimizer_G.step()
 
-            if (i + 1) % 200 == 0:
-                print(f"Epoch {epoch + 1} | Iter {i + 1} : Loss_D = {D_err:.3e}, Loss_G = {G_err:.3e}, D(x) = {D_x:.3e}, D(G(z)) = {D_G_z1:.3e} / {D_G_z2:.3e}")
+            log_period = len(dataloader) // 4 
+            if i % log_period == 0:
+                D_x = output_real.mean().item()
+                D_G_z1 = output_fake_detach.mean().item()
+                D_G_z2 = output_fake.mean().item()
+                print(
+                    f"Epoch {epoch+1} Iter {i+1} |"\
+                    f"Loss_D {D_err.item():.3e}, Loss_G = {G_err.item():.3e}, "\
+                    f"D(x) = {D_x:.3e}, D(G(z)) = {D_G_z1:.3e} / {D_G_z2:.3e}"
+                )
         
         netG.eval()
-        fixed_noise = torch.randn(args.batch_size, args.latent_dim, 1, 1).to(device)
+        fixed_noise = torch.randn(64, args.latent_dim, 1, 1).to(device)
         save_image(
             tensor=netG(fixed_noise).detach().cpu(),
             fp=os.path.join(

@@ -24,7 +24,9 @@ class Generator(nn.Module):
         elif final_act == 'relu':
             self.final_act = nn.ReLU()
         elif final_act == 'leakyrelu':
-            self.final_act = nn.LeakyReLU()
+            self.final_act = nn.LeakyReLU(
+                negative_slope=0.2,
+            )
 
         param_list = [
             nn.Sequential(
@@ -84,13 +86,13 @@ class Generator(nn.Module):
                     std=0.02,
                 )
                 nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.normal_(
-                    tensor=m.weight.data,
-                    mean=1.0,
-                    std=0.02,
-                )
-                nn.init.zeros_(m.bias)
+            # elif isinstance(m, nn.BatchNorm2d):
+            #     nn.init.normal_(
+            #         tensor=m.weight.data,
+            #         mean=1.0,
+            #         std=0.02,
+            #     )
+            #     nn.init.zeros_(m.bias)
 
     def forward(
             self,
@@ -181,13 +183,13 @@ class Discriminator(nn.Module):
                     std=0.02,
                 )
                 nn.init.zeros_(m.bias.data)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.normal_(
-                    tensor=m.weight.data,
-                    mean=1.0,
-                    std=0.02,
-                )
-                nn.init.zeros_(m.bias.data)
+            # elif isinstance(m, nn.BatchNorm2d):
+            #     nn.init.normal_(
+            #         tensor=m.weight.data,
+            #         mean=1.0,
+            #         std=0.02,
+            #     )
+            #     nn.init.zeros_(m.bias.data)
 
     def forward(
             self,
