@@ -7,10 +7,9 @@
 *.csv
 *.txt
 *.png
-*.tfevents
 
 # ignore certain folder under all subdirectories
 __pycache__/
 model_save/
 temp/
-
+train_log
