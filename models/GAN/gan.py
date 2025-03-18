@@ -11,7 +11,8 @@ class Generator(nn.Module):
         latent_dim: int = 128,
         num_doublesize: int = 5,
         num_filters: int = 64,
-        final_act: str = 'tanh'
+        final_act: str = 'tanh',
+        init_batchnorm: bool = False,
     ) -> None:
         super().__init__()
 
@@ -27,6 +28,8 @@ class Generator(nn.Module):
             self.final_act = nn.LeakyReLU(
                 negative_slope=0.2,
             )
+
+        self.init_batchnorm = init_batchnorm
 
         param_list = [
             nn.Sequential(
@@ -86,13 +89,13 @@ class Generator(nn.Module):
                     std=0.02,
                 )
                 nn.init.zeros_(m.bias)
-            # elif isinstance(m, nn.BatchNorm2d):
-            #     nn.init.normal_(
-            #         tensor=m.weight.data,
-            #         mean=1.0,
-            #         std=0.02,
-            #     )
-            #     nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d) and self.init_batchnorm:
+                nn.init.normal_(
+                    tensor=m.weight.data,
+                    mean=1.0,
+                    std=0.02,
+                )
+                nn.init.zeros_(m.bias)
 
     def forward(
             self,
@@ -108,7 +111,8 @@ class Discriminator(nn.Module):
         in_channels: int = 3,
         num_halfsize: int = 5,
         num_filters: int = 64,
-        final_act: str = 'sigmoid'
+        final_act: str = 'sigmoid',
+        init_batchnorm: bool = False,
     ) -> None:
         super().__init__()
 
@@ -123,6 +127,8 @@ class Discriminator(nn.Module):
         elif final_act == 'leakyrelu':
             self.final_act = nn.LeakyReLU()
 
+        self.init_batchnorm = init_batchnorm
+ 
         param_list = [
             nn.Sequential(
                 nn.Conv2d(
@@ -183,13 +189,13 @@ class Discriminator(nn.Module):
                     std=0.02,
                 )
                 nn.init.zeros_(m.bias.data)
-            # elif isinstance(m, nn.BatchNorm2d):
-            #     nn.init.normal_(
-            #         tensor=m.weight.data,
-            #         mean=1.0,
-            #         std=0.02,
-            #     )
-            #     nn.init.zeros_(m.bias.data)
+            elif isinstance(m, nn.BatchNorm2d) and self.init_batchnorm:
+                nn.init.normal_(
+                    tensor=m.weight.data,
+                    mean=1.0,
+                    std=0.02,
+                )
+                nn.init.zeros_(m.bias.data)
 
     def forward(
             self,
