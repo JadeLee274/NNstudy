@@ -8,8 +8,9 @@
 *.txt
 *.png
 
-# ignore certain folder under all subdirectories
+# ignore certain folder under all subdirectories, including itself
 __pycache__/
 model_save/
 temp/
-train_log
+log/
+train_log/
