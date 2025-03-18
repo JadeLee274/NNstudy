@@ -6,10 +6,13 @@ import torch.optim as optim
 import torchvision.transforms as T
 from torch.nn import DataParallel as dp
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from torchvision.datasets import MNIST
-from torchvision.utils import save_image
+from torchvision.utils import save_image, make_grid
 from gan import Generator, Discriminator
 ROOT = '/data/home/tmdals274/NNstudy/data'
+LOG_ROOT = '/data/home/tmdals274/NNstudy/models/GAN/train_log/mnist'
+
 
 parser = argparse.ArgumentParser()
 
@@ -32,6 +35,11 @@ parser.add_argument(
     "--epochs",
     type=int,
     default=100,
+)
+parser.add_argument(
+    "--discriminator-start",
+    type=int,
+    default=3,
 )
 parser.add_argument(
     "--start-train",
@@ -113,6 +121,9 @@ optimizer_D = optim.Adam(
     betas=(0.5, 0.999),
 )
 
+filename = f"bs_{args.batch_size}-ds_{args.discriminator_start}"
+writer = SummaryWriter(log_dir=os.path.join(LOG_ROOT, filename))
+
 
 def train() -> None:
     if args.start_train != 0:
@@ -156,7 +167,7 @@ def train() -> None:
             D_err_fake.backward()
 
             D_err = D_err_real + D_err_fake
-            if epoch >= 3:
+            if epoch >= args.discriminator_start:
                 optimizer_D.step()
 
             label.fill_(real_label)
@@ -175,17 +186,47 @@ def train() -> None:
                     f"Loss_D {D_err.item():.3e}, Loss_G = {G_err.item():.3e}, "\
                     f"D(x) = {D_x:.3e}, D(G(z)) = {D_G_z1:.3e} / {D_G_z2:.3e}"
                 )
+
+                step = epoch * len(dataloader) + i
+                writer.add_scalar("Loss_D", D_err.item(), step)
+                writer.add_scalar("Loss_G", G_err.item(), step)
+                writer.add_scalar("D_x", D_x, step)
+                writer.add_scalar("D_G_z1", D_G_z1, step)
+                writer.add_scalar("D_G_z2", D_G_z2, step)
         
         netG.eval()
         fixed_noise = torch.randn(64, args.latent_dim, 1, 1).to(device)
+        fake_images = netG(fixed_noise).detach().cpu()
         save_image(
-            tensor=netG(fixed_noise).detach().cpu(),
+            tensor=fake_images,
             fp=os.path.join(
                 './output/mnist',
                 f'./mnist_epoch_{(epoch + 1):03d}.png'
             )
         )
+        img_grid = make_grid(
+            tensor=fake_images,
+            normalize=True,
+        )
+        writer.add_image(
+            tag="Generated Images",
+            img_tensor=img_grid,
+            global_step=epoch,
+        )
         netG.train()
+
+        for name, param in netG.named_parameters():
+            writer.add_histogram(
+                tag=f"Generator/{name}",
+                values=param.clone().cpu().data.numpy(),
+                global_step=epoch,
+            )
+        for name, param in netD.named_parameters():
+            writer.add_histogram(
+                tag=f"Discriminator/{name}",
+                values=param.clone().cpu().data.numpy(),
+                global_step=epoch,
+            )
 
         if (epoch + 1) % args.save_interval == 0:
             torch.save(
@@ -208,6 +249,8 @@ def train() -> None:
                     f'mnist_discriminator_epoch_{epoch + 1:03d}.pt'
                 ),
             )
+    
+    writer.close()
 
 if __name__ == "__main__":
     train()
