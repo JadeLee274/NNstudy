@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
     if args.checkpoint != 0:
         checkpoint = torch.load(
-            f"./model_save/cifar10_vae_2/vae_epoch_{args.checkpoint}.pt"
+            f"./model_save/cifar10_vae/vae_epoch_{args.checkpoint}.pt"
         )
         model.load_state_dict(checkpoint['model'])
         optim.load_state_dict(checkpoint['optim'])
@@ -197,7 +197,7 @@ if __name__ == "__main__":
                     'optim': optim.state_dict(),
                     'sched': sched.state_dict(),
                 },
-                f'./model_save/cifar10_vae_2/vae_epoch_{epoch + 1}.pt',
+                f'./model_save/cifar10_vae/vae_epoch_{epoch + 1}.pt',
             )
 
             with torch.no_grad():
