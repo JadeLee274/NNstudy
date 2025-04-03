@@ -36,7 +36,7 @@ class TensorDataset(Dataset):
         return data
 
 
-class IMDBDataset(Dataset):
+class TextDataset(Dataset):
     def __init__(
             self,
             texts: List[int],
