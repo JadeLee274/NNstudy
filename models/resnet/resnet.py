@@ -55,11 +55,14 @@ class ResNet(nn.Module):
             
         return nn.Sequential(*layers)
 
+
 def ResNet50(num_classes, channels=3):
     return ResNet(Bottleneck, [3,4,6,3], num_classes, channels)
     
+
 def ResNet101(num_classes, channels=3):
     return ResNet(Bottleneck, [3,4,23,3], num_classes, channels)
+
 
 def ResNet152(num_classes, channels=3):
     return ResNet(Bottleneck, [3,8,36,3], num_classes, channels)
