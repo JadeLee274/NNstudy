@@ -10,23 +10,94 @@ __all__ = ['Attention', 'MultiHeadAttention']
 
 
 class Attention(nn.Module):
+    def __init__(
+        self,
+        d_model: int = 512,
+        d_k: int = 64,
+    ) -> None:
+        super().__init__()
+        self.w_q = nn.Linear(d_model, d_k)
+        self.w_k = nn.Linear(d_model, d_k)
+        self.w_v = nn.Linear(d_model, d_k)
+        self.d_k = d_k
+
     def forward(
         self,
-        query: Tensor,
-        key: Tensor,
-        value: Tensor,
-        mask = None
+        x: Tensor,
     ) -> Tensor:
-        d_k = query.size()[-1]
-        scores = query.matmul(key.transpose(-2, -1))
-        scores /= torch.sqrt(d_k)
-        if mask is not None:
-            scores = scores.masked_fill(mask == 0, 1e-9)
-        attn = torch.softmax(scores, dim=-1)
-        return attn.matmul(value)
+        q = self.w_q(x) # (B, seq_len, d_model) -> (B, seq_len, d_k)
+        k = self.w_k(x) # (B, seq_len, d_model) -> (B, seq_len, d_k)
+        v = self.w_v(x) # (B, seq_len, d_model) -> (B, seq_len, d_k)
+        attn_score = torch.bmm(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)
+        attn_score = F.softmax(attn_score, dim=-1) # (B, seq_len, seq_len)
+        attn = torch.bmm(attn_score, v) # (B, seq_len, d_k)
+        return attn
 
 
 class MultiHeadAttention(nn.Module):
+    def __init__(
+        self,
+        d_model: int = 512,
+        num_heads: int = 8,
+        bias: bool = False,
+    ) -> None:
+        super().__init__()
+        assert (
+            d_model % num_heads == 0,
+            f"d_model {d_model} must be divisible by num_heads {num_heads}"
+        )
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads
+        
+        self.w_q = nn.Linear(d_model, d_model, bias)
+        self.w_k = nn.Linear(d_model, d_model, bias)
+        self.w_v = nn.Linear(d_model, d_model, bias)
+        self.w_o = nn.Linear(d_model, d_model, bias)
+
+    def forward(
+        self,
+        x: Tensor,
+        mask: Optional[Tensor] = None,
+    ) -> None:
+        batch_size, seq_len, d_model = x.size()
+        
+        q = self.w_q(x)
+        k = self.w_k(x)
+        v = self.w_v(x)
+
+        q = q.view(
+            batch_size, seq_len, self.num_heads, self.d_k
+        ).transpose(1, 2) # (B, nheads, seq_len, d_k)
+        k = k.view(
+            batch_size, seq_len, self.num_heads, self.d_k
+        ).transpose(1, 2) # (B, nheads, seq_len, d_k)
+        v = v.view(
+            batch_size, seq_len, self.num_heads, self.d_k
+        ).transpose(1, 2) # (B, nheads, seq_len, d_k)
+
+        attn_scores = torch.bmm(
+            q, k.transpose(-2, -1)
+        ) / math.sqrt(self.d_k) # (B, nheads, seq_len, seq_len)
+
+        if mask is not None:
+            if mask.dim == 3:
+                mask = mask.unsqueeze(1)
+            attn_scores = attn_scores.masked_fill(mask == 0, float('-inf'))
+        
+        attn_scores = F.softmax(attn_scores, dim=-1)
+        attn = torch.bmm(attn_scores, v) # (B, nheads, seq_len, d_k)
+        attn = attn.transpose(1, 2) # (B, seq_len, nheads, d_k)
+        attn = attn.contiguous() # memory continuity for the next step
+        attn = attn.view(batch_size, seq_len, self.d_model) # (B, seq_len, d_model)
+        attn = self.w_o(attn) # (B, seq_len, d_model)
+        return attn
+
+
+
+###############################################################################
+
+class MultiHeadAttention_temp(nn.Module):
     def __init__(
         self,
         in_features: int,

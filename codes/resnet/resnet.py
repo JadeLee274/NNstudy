@@ -1,12 +1,19 @@
-from Blocks import *
 from typing import *
 import torch
 import torch.nn as nn
+from blocks import ResBlock, BottleNeck
+Tensor = torch.Tensor
 
 
 class ResNet(nn.Module):
-    def __init__(self, ResBlock, layer_list, num_classes, num_channels=3):
-        super(ResNet, self).__init__()
+    def __init__(
+            self,
+            ResBlock,
+            layer_list,
+            num_classes,
+            num_channels=3,
+        ):
+        super().__init__()
         self.in_channels = 64
         
         self.conv1 = nn.Conv2d(num_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -57,12 +64,12 @@ class ResNet(nn.Module):
 
 
 def ResNet50(num_classes, channels=3):
-    return ResNet(Bottleneck, [3,4,6,3], num_classes, channels)
+    return ResNet(BottleNeck, [3,4,6,3], num_classes, channels)
     
 
 def ResNet101(num_classes, channels=3):
-    return ResNet(Bottleneck, [3,4,23,3], num_classes, channels)
+    return ResNet(BottleNeck, [3,4,23,3], num_classes, channels)
 
 
 def ResNet152(num_classes, channels=3):
-    return ResNet(Bottleneck, [3,8,36,3], num_classes, channels)
+    return ResNet(BottleNeck, [3,8,36,3], num_classes, channels)
