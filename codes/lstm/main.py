@@ -7,9 +7,9 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from nltk.tokenize import word_tokenize
 from typing import *
-from preprocess import *
-from LSTMClassifier import *
-from IMDBDAtaset import *
+from utils.preprocess_text import *
+from models.lstm_classifier import *
+from utils.textdataset import *
 
 
 if __name__ == "__main__":
@@ -91,12 +91,12 @@ if __name__ == "__main__":
         test_data['idexed'].tolist(), test_data['sentiment'].tolist(),
     )
 
-    train_dataset = IMDBDataset(
+    train_dataset = TextDataset(
         texts=train_texts,
         labels=train_labels,
     )
 
-    test_dataset = IMDBDataset(
+    test_dataset = TextDataset(
         texts=test_texts,
         labels=test_labels,
     )

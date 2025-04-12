@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.datasets import MNIST
 from torchvision.utils import save_image, make_grid
-from gan import Generator, Discriminator
+from models.gan import Generator, Discriminator
 ROOT = '/data/home/tmdals274/NNstudy/data'
 LOG_ROOT = '/data/home/tmdals274/NNstudy/models/GAN/train_log/mnist'
 

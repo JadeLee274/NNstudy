@@ -5,8 +5,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import time
-import utils.path_setup
-from models.resnet.resnet import ResNet152
+from models.resnet import ResNet152
 
 
 def main():

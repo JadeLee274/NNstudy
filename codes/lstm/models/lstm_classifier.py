@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 Tensor = torch.Tensor
 
+
 class LSTMClassifier(nn.Module):
     def __init__(
             self,

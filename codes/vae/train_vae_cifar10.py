@@ -7,8 +7,8 @@ from torchvision.utils import save_image, make_grid
 from torch.optim import lr_scheduler as scheduler
 import matplotlib.pyplot as plt
 from typing import *
-from vae import *
-from tensordataset import TensorDataset
+from models.vae import VAE
+from utils.mydataset import TensorDataset
 DATA_ROOT = '/data/home/tmdals274/NNstudy/data'
 OUTPUT_DIR = './outputs_cifar10_2'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
