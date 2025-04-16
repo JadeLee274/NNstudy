@@ -10,9 +10,10 @@
 
 # ignore certain folder under all subdirectories, including itself
 __pycache__/
-model_save/
+save/
 temp/
 log/
 train_log/
 outputs/
 train/
+.data/
