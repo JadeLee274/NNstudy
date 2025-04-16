@@ -8,3 +8,5 @@ But when it comes to transformer, it needs torchtext, of which the development i
 - Pytorch 1.7.0
 - Torchvision 0.8.1
 - Torchtext 0.8.0
+
+(The transformer code needs further improvement.)
